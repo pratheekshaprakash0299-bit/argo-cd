@@ -13,8 +13,8 @@ pipeline {
         AWS_REGION = "ap-south-1"
         ACCOUNT_ID = "220309168382"
         ECR_REPO = "sonarqube-project"
+        IMAGE_REPO = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}"
         IMAGE_TAG = "${BUILD_NUMBER}"
-        IMAGE_URI = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
         PROJECT_KEY = "sonarqube-project"
     }
 
@@ -33,39 +33,37 @@ pipeline {
                     withCredentials([
                         string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')
                     ]) {
-                        sh """
+                        sh '''
                             mvn clean verify sonar:sonar \
-                              -Dsonar.projectKey=${PROJECT_KEY} \
-                              -Dsonar.projectName=${PROJECT_KEY} \
-                              -Dsonar.token=${SONAR_TOKEN}
-                        """
+                              -Dsonar.projectKey=sonarqube-project \
+                              -Dsonar.projectName=sonarqube-project \
+                              -Dsonar.token=$SONAR_TOKEN
+                        '''
                     }
                 }
             }
         }
 
         stage('Quality Gate') {
-    steps {
-        timeout(time: 10, unit: 'MINUTES') {
-            waitForQualityGate abortPipeline: false
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false
+                }
+            }
         }
-    }
-}
 
         stage('Build Docker Image') {
             steps {
                 sh """
                     echo "Building Docker image with tag ${IMAGE_TAG}"
-                    
-                    docker build -t ${IMAGE_URI}:${IMAGE_TAG} .
+                    docker build -t ${IMAGE_REPO}:${IMAGE_TAG} .
                     
                     echo "Tagging image as latest"
-                    
-                    docker tag ${IMAGE_URI}:${IMAGE_TAG} ${IMAGE_URI}:latest
+                    docker tag ${IMAGE_REPO}:${IMAGE_TAG} ${IMAGE_REPO}:latest
                 """
             }
         }
-        
+
         stage('Login to ECR') {
             steps {
                 sh """
@@ -78,15 +76,16 @@ pipeline {
         stage('Push Image to ECR') {
             steps {
                 sh """
-                    echo "Pushing build number tag ${IMAGE_TAG}"
-                    docker push ${IMAGE_URI}:${IMAGE_TAG}
-                    
-                    echo "Pushing latest tag"
-                    docker push ${IMAGE_URI}:latest
+                    echo "Pushing image with build number tag ${IMAGE_TAG}"
+                    docker push ${IMAGE_REPO}:${IMAGE_TAG}
+
+                    echo "Pushing image with latest tag"
+                    docker push ${IMAGE_REPO}:latest
                 """
             }
         }
     }
+
     post {
         success {
             echo "Pipeline executed successfully!"
