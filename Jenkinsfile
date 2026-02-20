@@ -52,14 +52,20 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image (Code Built Inside Docker)') {
+        stage('Build Docker Image') {
             steps {
                 sh """
-                    docker build -t ${IMAGE_URI} .
+                    echo "Building Docker image with tag ${IMAGE_TAG}"
+                    
+                    docker build -t ${IMAGE_URI}:${IMAGE_TAG} .
+                    
+                    echo "Tagging image as latest"
+                    
+                    docker tag ${IMAGE_URI}:${IMAGE_TAG} ${IMAGE_URI}:latest
                 """
             }
         }
-
+        
         stage('Login to ECR') {
             steps {
                 sh """
@@ -72,12 +78,15 @@ pipeline {
         stage('Push Image to ECR') {
             steps {
                 sh """
-                    docker push ${IMAGE_URI}
+                    echo "Pushing build number tag ${IMAGE_TAG}"
+                    docker push ${IMAGE_URI}:${IMAGE_TAG}
+                    
+                    echo "Pushing latest tag"
+                    docker push ${IMAGE_URI}:latest
                 """
             }
         }
     }
-
     post {
         success {
             echo "Pipeline executed successfully!"
