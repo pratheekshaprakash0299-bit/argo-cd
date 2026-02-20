@@ -20,6 +20,7 @@ pipeline {
 
     stages {
 
+        // ================= CHECKOUT =================
         stage('Checkout (Select Branch From Dropdown)') {
             steps {
                 git branch: "${params.BRANCH}",
@@ -27,6 +28,7 @@ pipeline {
             }
         }
 
+        // ================= SONAR =================
         stage('Sonar Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
@@ -44,6 +46,7 @@ pipeline {
             }
         }
 
+        // ================= QUALITY GATE =================
         stage('Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
@@ -52,6 +55,7 @@ pipeline {
             }
         }
 
+        // ================= DOCKER BUILD =================
         stage('Build Docker Image') {
             steps {
                 sh """
@@ -64,15 +68,22 @@ pipeline {
             }
         }
 
+        // ================= LOGIN TO ECR USING AWS ACCESS KEY =================
         stage('Login to ECR') {
             steps {
-                sh """
-                    aws ecr get-login-password --region ${AWS_REGION} | \
-                    docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-                """
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-ecr-credentials'
+                ]]) {
+                    sh """
+                        aws ecr get-login-password --region ${AWS_REGION} | \
+                        docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                    """
+                }
             }
         }
 
+        // ================= PUSH IMAGE =================
         stage('Push Image to ECR') {
             steps {
                 sh """
