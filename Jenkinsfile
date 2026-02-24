@@ -20,7 +20,6 @@ pipeline {
 
     stages {
 
-        // ================= CHECKOUT =================
         stage('Checkout (Select Branch From Dropdown)') {
             steps {
                 git branch: "${params.BRANCH}",
@@ -28,7 +27,6 @@ pipeline {
             }
         }
 
-        // ================= SONAR =================
         stage('Sonar Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
@@ -46,7 +44,6 @@ pipeline {
             }
         }
 
-        // ================= QUALITY GATE =================
         stage('Quality Gate') {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
@@ -55,7 +52,6 @@ pipeline {
             }
         }
 
-        // ================= DOCKER BUILD =================
         stage('Build Docker Image') {
             steps {
                 sh """
@@ -68,7 +64,6 @@ pipeline {
             }
         }
 
-        // ================= LOGIN TO ECR USING AWS ACCESS KEY =================
         stage('Login to ECR') {
             steps {
                 withCredentials([[
@@ -82,8 +77,7 @@ pipeline {
                 }
             }
         }
-
-        // ================= PUSH IMAGE =================
+        
         stage('Push Image to ECR') {
             steps {
                 sh """
@@ -97,9 +91,35 @@ pipeline {
         }
     }
 
+    stage('Update K8s Manifest & Push to GitHub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-creds',
+                    usernameVariable: 'GIT_USER',
+                    passwordVariable: 'GIT_PASS'
+                )]) {
+
+                    sh """
+                        echo "Updating deployment.yaml with new image tag"
+
+                        git config user.email "jenkins@local"
+                        git config user.name "jenkins"
+
+                        sed -i 's|image:.*|image: ${IMAGE_URI}:${IMAGE_TAG}|g' k8s/deployment.yaml
+
+                        git add k8s/deployment.yaml
+                        git commit -m "Updated image to ${IMAGE_TAG}"
+                        
+                        git push https://${GIT_USER}:${GIT_PASS}@github.com/pratheekshaprakash0299-bit/argo-cd.git HEAD:${params.BRANCH}
+                    """
+                }
+            }
+        }
+    }
+
     post {
         success {
-            echo "Pipeline executed successfully!"
+            echo "Pipeline executed successfully! ArgoCD will deploy automatically."
         }
         failure {
             echo "Pipeline failed!"
