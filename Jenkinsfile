@@ -55,10 +55,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh """
-                    echo "Building Docker image with tag ${IMAGE_TAG}"
                     docker build -t ${IMAGE_REPO}:${IMAGE_TAG} .
-                    
-                    echo "Tagging image as latest"
                     docker tag ${IMAGE_REPO}:${IMAGE_TAG} ${IMAGE_REPO}:latest
                 """
             }
@@ -77,21 +74,17 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Push Image to ECR') {
             steps {
                 sh """
-                    echo "Pushing image with build number tag ${IMAGE_TAG}"
                     docker push ${IMAGE_REPO}:${IMAGE_TAG}
-
-                    echo "Pushing image with latest tag"
                     docker push ${IMAGE_REPO}:latest
                 """
             }
         }
-    }
 
-    stage('Update K8s Manifest & Push to GitHub') {
+        stage('Update K8s Manifest & Push to GitHub') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'github-creds',
@@ -100,16 +93,14 @@ pipeline {
                 )]) {
 
                     sh """
-                        echo "Updating deployment.yaml with new image tag"
-
                         git config user.email "jenkins@local"
                         git config user.name "jenkins"
 
-                        sed -i 's|image:.*|image: ${IMAGE_URI}:${IMAGE_TAG}|g' k8s/deployment.yaml
+                        sed -i 's|image:.*|image: ${IMAGE_REPO}:${IMAGE_TAG}|g' k8s/deployment.yaml
 
                         git add k8s/deployment.yaml
-                        git commit -m "Updated image to ${IMAGE_TAG}"
-                        
+                        git commit -m "Updated image to ${IMAGE_TAG}" || echo "No changes to commit"
+
                         git push https://${GIT_USER}:${GIT_PASS}@github.com/pratheekshaprakash0299-bit/argo-cd.git HEAD:${params.BRANCH}
                     """
                 }
