@@ -17,3 +17,5 @@ spec:
           image: 220309168382.dkr.ecr.ap-south-1.amazonaws.com/sonarqube-project:11
           ports:
             - containerPort: 8080
+      imagePullSecrets:
+        - name: ecr-secret
