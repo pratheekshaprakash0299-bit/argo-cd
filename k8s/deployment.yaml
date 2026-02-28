@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: demo-app
-          image: 220309168382.dkr.ecr.ap-south-1.amazonaws.com/sonarqube-project:11
+          image: 220309168382.dkr.ecr.ap-south-1.amazonaws.com/sonarqube-project:12
           ports:
             - containerPort: 8080
       imagePullSecrets:
